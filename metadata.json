@@ -1,0 +1,6 @@
+{
+  "name": "AuxMadOpGame — Test Auxiliar Administrativo Ayuntamiento de Madrid",
+  "description": "Entrenamiento gamificado tipo Duolingo y simulador de examen oficial para Auxiliar Administrativo del Ayuntamiento de Madrid (Subgrupo C2) con penalización -1/3, casos prácticos y cálculo de plazos.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
