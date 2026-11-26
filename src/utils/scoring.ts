@@ -1,3 +1,4 @@
+import { CANONICAL_ROOT_URL } from '../config/seo';
 import { ExamConfig, SharedChallengePayload } from '../types';
 
 export interface ScoreSummary {
@@ -101,9 +102,7 @@ function fromBase64Url(b64: string): string {
 
 export function buildChallengeUrl(payload: SharedChallengePayload): string {
   const encoded = toBase64Url(JSON.stringify(payload));
-  const url = new URL(window.location.href);
-  url.search = '';
-  url.hash = '';
+  const url = new URL(CANONICAL_ROOT_URL);
   url.searchParams.set('reto', encoded);
   return url.toString();
 }

@@ -8,6 +8,7 @@ import { LessonResultSummary, LessonRunner } from './components/LessonRunner';
 import { MistakeClinicView } from './components/MistakeClinicView';
 import { SyllabusAndBankView } from './components/SyllabusAndBankView';
 import { TopBar } from './components/TopBar';
+import { syncSeoHeadTags } from './config/seo';
 import {
   EMBEDDED_QUESTIONS,
   loadOptionalStaticPacks,
@@ -68,6 +69,11 @@ export default function App() {
   useEffect(() => {
     saveProgress(progress);
   }, [progress]);
+
+  // Sync canonical, hreflang, og:url & twitter:url strictly from CANONICAL_ORIGIN
+  useEffect(() => {
+    syncSeoHeadTags();
+  }, [activeView]);
 
   // Load optional /data/mad-bloque*.json files & check URL challenge
   useEffect(() => {
