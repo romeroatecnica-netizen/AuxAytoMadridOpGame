@@ -69,6 +69,7 @@ export interface CustomQuestionPack {
 }
 
 export interface UserProgress {
+  playerName?: string;
   xp: number;
   streakDays: number;
   lastActiveDate: string;
@@ -98,8 +99,11 @@ export interface ExamConfig {
   reserveCount: number;
   blocks: BlockId[];
   onlyCases: boolean;
+  onlyTraps?: boolean;
   timeLimitMinutes: number | null;
   seed?: number;
+  challengeId?: string;
+  rotationIndex?: number;
 }
 
 export interface SharedChallengePayload {
@@ -113,5 +117,6 @@ export interface SharedChallengePayload {
     netScore: number;
     maxScore: number;
     scaledOver10: number;
+    durationSeconds?: number;
   };
 }

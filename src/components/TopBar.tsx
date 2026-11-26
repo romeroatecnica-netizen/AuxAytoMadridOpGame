@@ -15,7 +15,7 @@ interface TopBarProps {
 }
 
 const NAV_ITEMS: { id: AppView; label: string }[] = [
-  { id: 'ruta', label: 'Ruta Duolingo' },
+  { id: 'ruta', label: 'Ruta de Estudio' },
   { id: 'simulador', label: 'Simulador Test' },
   { id: 'casos', label: 'Casos y Plazos' },
   { id: 'clinica', label: 'Clínica de Fallos' },

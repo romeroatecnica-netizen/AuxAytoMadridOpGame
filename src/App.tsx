@@ -2,8 +2,9 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Check, Copy } from 'lucide-react';
 import { AdAndSeoSection } from './components/AdAndSeoSection';
 import { CasesAndDeadlinesView } from './components/CasesAndDeadlinesView';
-import { DuolingoPathView } from './components/DuolingoPathView';
+import { ChallengeModal } from './components/ChallengeModal';
 import { ExamSimulator } from './components/ExamSimulator';
+import { LearningPathView } from './components/LearningPathView';
 import { LessonResultSummary, LessonRunner } from './components/LessonRunner';
 import { MistakeClinicView } from './components/MistakeClinicView';
 import { SyllabusAndBankView } from './components/SyllabusAndBankView';
@@ -19,6 +20,7 @@ import {
   AppView,
   BlockId,
   CustomQuestionPack,
+  ExamConfig,
   ExamRecord,
   MinigameType,
   Question,
@@ -61,6 +63,9 @@ export default function App() {
 
   const [activeLesson, setActiveLesson] = useState<ActiveLessonState | null>(null);
   const [isExamRunning, setIsExamRunning] = useState(false);
+  const [isChallengeModalOpen, setIsChallengeModalOpen] = useState(false);
+  const [pendingChallengeLaunch, setPendingChallengeLaunch] =
+    useState<SharedChallengePayload | null>(null);
   const [incomingChallenge, setIncomingChallenge] =
     useState<SharedChallengePayload | null>(null);
   const [shareToast, setShareToast] = useState<string | null>(null);
@@ -124,18 +129,19 @@ export default function App() {
   }, []);
 
   const handleGlobalShareChallenge = () => {
-    handleSharePayload({
+    setIsChallengeModalOpen(true);
+  };
+
+  const handlePlayAndChallenge = (config: ExamConfig, senderName: string) => {
+    setIsChallengeModalOpen(false);
+    setActiveLesson(null);
+    setActiveView('simulador');
+    setPendingChallengeLaunch({
       type: 'challenge',
-      config: {
-        modeLabel: 'Reto Rápido Ayuntamiento de Madrid (25 preg.)',
-        ordinaryCount: 25,
-        reserveCount: 3,
-        blocks: [1, 2, 3, 4, 5, 6, 7],
-        onlyCases: false,
-        timeLimitMinutes: 25,
-        seed: Math.floor(Date.now() % 1000000),
-      },
+      senderName: senderName || undefined,
+      config,
     });
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const handleStartUnitLesson = (
@@ -381,7 +387,7 @@ export default function App() {
         ) : (
           <>
             {activeView === 'ruta' && (
-              <DuolingoPathView
+              <LearningPathView
                 questions={allQuestions}
                 progress={progress}
                 activeMistakeCount={activeMistakes.length}
@@ -390,6 +396,7 @@ export default function App() {
                 onToggleFreePractice={handleToggleFreePractice}
                 onRestoreShields={handleRestoreShields}
                 onGoToSimulator={() => handleNavigate('simulador')}
+                onOpenChallengeModal={() => setIsChallengeModalOpen(true)}
               />
             )}
 
@@ -397,8 +404,12 @@ export default function App() {
               <ExamSimulator
                 questions={allQuestions}
                 examHistory={progress.examHistory}
+                playerName={progress.playerName}
                 incomingChallenge={incomingChallenge}
+                pendingChallengeLaunch={pendingChallengeLaunch}
+                onConsumePendingChallengeLaunch={() => setPendingChallengeLaunch(null)}
                 onClearIncomingChallenge={() => setIncomingChallenge(null)}
+                onOpenChallengeModal={() => setIsChallengeModalOpen(true)}
                 onExamActiveChange={setIsExamRunning}
                 onFinishExam={handleFinishExam}
                 onShareExamPayload={handleSharePayload}
@@ -447,7 +458,7 @@ export default function App() {
               onClick={() => handleNavigate('ruta')}
               className="hover:text-[#0F172A] cursor-pointer"
             >
-              Ruta Duolingo
+              Ruta de Estudio
             </button>
             <button
               type="button"
@@ -473,6 +484,16 @@ export default function App() {
           </div>
         </div>
       </footer>
+
+      <ChallengeModal
+        isOpen={isChallengeModalOpen}
+        playerName={progress.playerName ?? ''}
+        onChangePlayerName={(name) =>
+          setProgress((prev) => ({ ...prev, playerName: name }))
+        }
+        onClose={() => setIsChallengeModalOpen(false)}
+        onPlayAndChallenge={handlePlayAndChallenge}
+      />
     </div>
   );
 }

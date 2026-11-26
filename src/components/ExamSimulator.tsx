@@ -9,6 +9,8 @@ import {
   Printer,
   RotateCcw,
   Share2,
+  Swords,
+  Trophy,
   XCircle,
 } from 'lucide-react';
 import { SYLLABUS_BLOCKS } from '../data/syllabus';
@@ -19,6 +21,10 @@ import {
   Question,
   SharedChallengePayload,
 } from '../types';
+import {
+  generateNextRotatingChallenge,
+  shuffleQuestionOptions,
+} from '../utils/challenges';
 import { generateDeterministicCaseBatch } from '../utils/deadlines';
 import {
   calculateMadridExamScore,
@@ -30,8 +36,12 @@ import {
 interface ExamSimulatorProps {
   questions: Question[];
   examHistory: ExamRecord[];
+  playerName?: string;
   incomingChallenge: SharedChallengePayload | null;
+  pendingChallengeLaunch?: SharedChallengePayload | null;
+  onConsumePendingChallengeLaunch?: () => void;
   onClearIncomingChallenge: () => void;
+  onOpenChallengeModal?: () => void;
   onExamActiveChange: (active: boolean) => void;
   onFinishExam: (
     record: ExamRecord,
@@ -49,8 +59,12 @@ type ReviewFilter = 'all' | 'wrong' | 'blank' | 'correct';
 export const ExamSimulator: React.FC<ExamSimulatorProps> = ({
   questions,
   examHistory,
+  playerName,
   incomingChallenge,
+  pendingChallengeLaunch,
+  onConsumePendingChallengeLaunch,
   onClearIncomingChallenge,
+  onOpenChallengeModal,
   onExamActiveChange,
   onFinishExam,
   onShareExamPayload,
@@ -67,6 +81,8 @@ export const ExamSimulator: React.FC<ExamSimulatorProps> = ({
 
   // Active exam state
   const [activeConfig, setActiveConfig] = useState<ExamConfig | null>(null);
+  const [activeChallengeSource, setActiveChallengeSource] =
+    useState<SharedChallengePayload | null>(null);
   const [examQuestions, setExamQuestions] = useState<Question[]>([]);
   const [ordinaryLen, setOrdinaryLen] = useState<number>(0);
   const [answers, setAnswers] = useState<Record<number, number | null>>({});
@@ -82,13 +98,19 @@ export const ExamSimulator: React.FC<ExamSimulatorProps> = ({
   const [lastRecord, setLastRecord] = useState<ExamRecord | null>(null);
 
   const startExamWithConfig = useCallback(
-    (cfg: ExamConfig) => {
+    (cfg: ExamConfig, challengeSource: SharedChallengePayload | null = null) => {
       let pool = questions.filter((q) => cfg.blocks.includes(q.blockId));
 
       if (cfg.onlyCases) {
         const embeddedCases = pool.filter((q) => q.isCase);
         const generated = generateDeterministicCaseBatch(cfg.seed ?? 101, 12);
         pool = [...embeddedCases, ...generated];
+      } else if (cfg.onlyTraps) {
+        const trapPool = pool.filter((q) => q.isTrap);
+        pool =
+          trapPool.length >= cfg.ordinaryCount
+            ? trapPool
+            : [...trapPool, ...pool.filter((q) => !q.isTrap && q.difficulty === 'examen')];
       } else if (pool.length < cfg.ordinaryCount + cfg.reserveCount) {
         // Supplement deterministically with procedural cases if user requested 80-100 on narrow block filter
         const generated = generateDeterministicCaseBatch(cfg.seed ?? 202, 10);
@@ -97,10 +119,15 @@ export const ExamSimulator: React.FC<ExamSimulatorProps> = ({
 
       const shuffled = shuffleDeterministic(pool, cfg.seed);
       const totalNeeded = Math.min(shuffled.length, cfg.ordinaryCount + cfg.reserveCount);
-      const selected = shuffled.slice(0, totalNeeded);
+      const rawSelected = shuffled.slice(0, totalNeeded);
+      const selected =
+        cfg.seed !== undefined
+          ? rawSelected.map((q, idx) => shuffleQuestionOptions(q, cfg.seed!, idx))
+          : rawSelected;
       const actualOrdinary = Math.min(cfg.ordinaryCount, selected.length);
 
       setActiveConfig(cfg);
+      setActiveChallengeSource(challengeSource);
       setExamQuestions(selected);
       setOrdinaryLen(actualOrdinary);
       setAnswers({});
@@ -116,6 +143,14 @@ export const ExamSimulator: React.FC<ExamSimulatorProps> = ({
     },
     [questions, onExamActiveChange]
   );
+
+  // Launch immediately when triggered from ChallengeModal or incoming challenge banner
+  useEffect(() => {
+    if (pendingChallengeLaunch) {
+      startExamWithConfig(pendingChallengeLaunch.config, pendingChallengeLaunch);
+      onConsumePendingChallengeLaunch?.();
+    }
+  }, [pendingChallengeLaunch, startExamWithConfig, onConsumePendingChallengeLaunch]);
 
   // Apply incoming shared challenge if present
   useEffect(() => {
@@ -314,7 +349,12 @@ export const ExamSimulator: React.FC<ExamSimulatorProps> = ({
           <div className="rounded-xl border border-[#1E3A8A]/30 bg-[#EFF6FF] p-5 flex flex-wrap items-center justify-between gap-4">
             <div>
               <p className="text-xs font-bold text-[#1E3A8A]">
-                Reto recibido por enlace URL
+                {incomingChallenge.senderName
+                  ? `Reto recibido de ${incomingChallenge.senderName}`
+                  : 'Reto recibido por enlace URL'}
+                {incomingChallenge.config.challengeId
+                  ? ` · ${incomingChallenge.config.challengeId}`
+                  : ''}
               </p>
               <h2 className="mt-0.5 text-base font-bold text-[#0F172A]">
                 {incomingChallenge.config.modeLabel} ({incomingChallenge.config.ordinaryCount} preguntas
@@ -327,17 +367,21 @@ export const ExamSimulator: React.FC<ExamSimulatorProps> = ({
                 <p className="mt-1 text-sm text-[#334155] tabular-nums">
                   Marca a batir: <strong>{formatScore(incomingChallenge.result.netScore)} pts netos</strong>{' '}
                   ({formatScore(incomingChallenge.result.scaledOver10)}/10 · {incomingChallenge.result.hits} aciertos,{' '}
-                  {incomingChallenge.result.misses} fallos)
+                  {incomingChallenge.result.misses} fallos
+                  {incomingChallenge.result.durationSeconds !== undefined
+                    ? ` · ${formatDuration(incomingChallenge.result.durationSeconds)}`
+                    : ''}
+                  )
                 </p>
               )}
             </div>
             <div className="flex items-center gap-2">
               <button
                 type="button"
-                onClick={() => startExamWithConfig(incomingChallenge.config)}
+                onClick={() => startExamWithConfig(incomingChallenge.config, incomingChallenge)}
                 className="rounded-lg bg-[#1E3A8A] px-4 py-2 text-xs font-semibold text-white hover:bg-[#172D6E] cursor-pointer"
               >
-                Aceptar mismo examen
+                Aceptar reto y empezar
               </button>
               <button
                 type="button"
@@ -539,11 +583,23 @@ export const ExamSimulator: React.FC<ExamSimulatorProps> = ({
             </div>
 
             <div className="flex flex-wrap items-center gap-3">
+              {onOpenChallengeModal && (
+                <button
+                  type="button"
+                  onClick={onOpenChallengeModal}
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-[#9F1239]/30 bg-[#FFF1F2] px-4 py-2.5 text-sm font-semibold text-[#9F1239] hover:bg-[#FFE4E6] cursor-pointer"
+                >
+                  <Swords className="h-4 w-4" aria-hidden="true" />
+                  <span>Reto aleatorio por enlace</span>
+                </button>
+              )}
+
               <button
                 type="button"
                 onClick={() =>
                   onShareExamPayload({
                     type: 'challenge',
+                    senderName: playerName?.trim() || undefined,
                     config: {
                       modeLabel,
                       ordinaryCount,
@@ -552,13 +608,14 @@ export const ExamSimulator: React.FC<ExamSimulatorProps> = ({
                       onlyCases,
                       timeLimitMinutes,
                       seed: Math.floor(Date.now() % 1000000),
+                      challengeId: `R-${Math.floor(Date.now() % 1000000).toString(36).toUpperCase()}`,
                     },
                   })
                 }
                 className="inline-flex items-center gap-1.5 rounded-lg border border-[#CBD5E1] bg-white px-4 py-2.5 text-sm font-semibold text-[#334155] hover:bg-[#F8FAFC] cursor-pointer"
               >
                 <Share2 className="h-4 w-4" aria-hidden="true" />
-                <span>Copiar enlace de este reto</span>
+                <span>Copiar enlace de esta configuración</span>
               </button>
 
               <button
@@ -898,6 +955,7 @@ export const ExamSimulator: React.FC<ExamSimulatorProps> = ({
                   if (!activeConfig) return;
                   onShareExamPayload({
                     type: 'result',
+                    senderName: playerName?.trim() || undefined,
                     config: activeConfig,
                     result: {
                       hits: lastRecord.hits,
@@ -906,13 +964,29 @@ export const ExamSimulator: React.FC<ExamSimulatorProps> = ({
                       netScore: lastRecord.netScore,
                       maxScore: lastRecord.maxScore,
                       scaledOver10: lastRecord.scaledOver10,
+                      durationSeconds: lastRecord.durationSeconds,
                     },
                   });
                 }}
-                className="inline-flex items-center gap-1.5 rounded-lg border border-[#CBD5E1] bg-white px-3.5 py-2 text-xs font-semibold text-[#334155] hover:bg-[#F8FAFC] cursor-pointer"
+                className="inline-flex items-center gap-1.5 rounded-lg border border-[#1E3A8A] bg-[#EFF6FF] px-3.5 py-2 text-xs font-semibold text-[#1E3A8A] hover:bg-[#DBEAFE] cursor-pointer"
               >
                 <Share2 className="h-3.5 w-3.5" aria-hidden="true" />
-                <span>Compartir resultado</span>
+                <span>Enviar mi marca por enlace</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  const nextCfg = generateNextRotatingChallenge(activeConfig?.rotationIndex);
+                  onShareExamPayload({
+                    type: 'challenge',
+                    senderName: playerName?.trim() || undefined,
+                    config: nextCfg,
+                  });
+                }}
+                className="inline-flex items-center gap-1.5 rounded-lg bg-[#9F1239] px-3.5 py-2 text-xs font-semibold text-white hover:bg-[#881337] cursor-pointer"
+              >
+                <Swords className="h-3.5 w-3.5" aria-hidden="true" />
+                <span>Lanzar revancha (prueba nueva)</span>
               </button>
               <button
                 type="button"
@@ -932,6 +1006,69 @@ export const ExamSimulator: React.FC<ExamSimulatorProps> = ({
               </button>
             </div>
           </div>
+
+          {/* Head-to-head Duel Comparison when answering a friend's scored challenge */}
+          {activeChallengeSource?.result && (
+            <div className="mt-5 rounded-xl border border-[#1E3A8A]/25 bg-[#EFF6FF]/60 p-4 sm:p-5">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div className="inline-flex items-center gap-2 text-sm font-extrabold text-[#0F172A]">
+                  <Trophy className="h-4 w-4 text-[#D97706]" aria-hidden="true" />
+                  <span>
+                    Comparativa del Reto · Tú vs.{' '}
+                    {activeChallengeSource.senderName || 'Retador'}
+                  </span>
+                </div>
+                <span
+                  className={`text-xs font-extrabold ${
+                    simulatedSummary.rawNetScore > activeChallengeSource.result.netScore
+                      ? 'text-[#059669]'
+                      : simulatedSummary.rawNetScore < activeChallengeSource.result.netScore
+                        ? 'text-[#DC2626]'
+                        : 'text-[#1E3A8A]'
+                  }`}
+                >
+                  {simulatedSummary.rawNetScore > activeChallengeSource.result.netScore
+                    ? '¡Has ganado el reto!'
+                    : simulatedSummary.rawNetScore < activeChallengeSource.result.netScore
+                      ? 'Ventaja para el retador — lanza una revancha'
+                      : 'Empate exacto en puntuación neta'}
+                </span>
+              </div>
+
+              <div className="mt-3 grid gap-3 sm:grid-cols-2 tabular-nums text-xs">
+                <div className="rounded-lg border border-[#E2E8F0] bg-white p-3.5">
+                  <div className="font-bold text-[#1E3A8A]">
+                    {playerName?.trim() || 'Tu resultado'}
+                  </div>
+                  <div className="mt-1 text-lg font-extrabold text-[#0F172A]">
+                    {formatScore(simulatedSummary.rawNetScore)} pts netos ({formatScore(simulatedSummary.scaledOver10)}/10)
+                  </div>
+                  <div className="mt-1 text-[#475569]">
+                    {simulatedSummary.hits} aciertos · {simulatedSummary.misses} fallos ·{' '}
+                    {simulatedSummary.blank} blanco · {formatDuration(lastRecord.durationSeconds)}
+                  </div>
+                </div>
+
+                <div className="rounded-lg border border-[#E2E8F0] bg-white p-3.5">
+                  <div className="font-bold text-[#9F1239]">
+                    {activeChallengeSource.senderName || 'Retador'}
+                  </div>
+                  <div className="mt-1 text-lg font-extrabold text-[#0F172A]">
+                    {formatScore(activeChallengeSource.result.netScore)} pts netos (
+                    {formatScore(activeChallengeSource.result.scaledOver10)}/10)
+                  </div>
+                  <div className="mt-1 text-[#475569]">
+                    {activeChallengeSource.result.hits} aciertos ·{' '}
+                    {activeChallengeSource.result.misses} fallos ·{' '}
+                    {activeChallengeSource.result.blank} blanco
+                    {activeChallengeSource.result.durationSeconds !== undefined
+                      ? ` · ${formatDuration(activeChallengeSource.result.durationSeconds)}`
+                      : ''}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* KPI Strip */}
           <div className="mt-6 grid gap-3 grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 tabular-nums">

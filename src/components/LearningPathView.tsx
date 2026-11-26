@@ -10,11 +10,12 @@ import {
   Shield,
   Sparkles,
   Stethoscope,
+  Swords,
 } from 'lucide-react';
 import { SYLLABUS_BLOCKS } from '../data/syllabus';
 import { BlockId, MinigameType, Question, UserProgress } from '../types';
 
-interface DuolingoPathViewProps {
+interface LearningPathViewProps {
   questions: Question[];
   progress: UserProgress;
   activeMistakeCount: number;
@@ -23,9 +24,10 @@ interface DuolingoPathViewProps {
   onToggleFreePractice: () => void;
   onRestoreShields: () => void;
   onGoToSimulator: () => void;
+  onOpenChallengeModal: () => void;
 }
 
-export const DuolingoPathView: React.FC<DuolingoPathViewProps> = ({
+export const LearningPathView: React.FC<LearningPathViewProps> = ({
   questions,
   progress,
   activeMistakeCount,
@@ -34,6 +36,7 @@ export const DuolingoPathView: React.FC<DuolingoPathViewProps> = ({
   onToggleFreePractice,
   onRestoreShields,
   onGoToSimulator,
+  onOpenChallengeModal,
 }) => {
   const totalLessons = SYLLABUS_BLOCKS.reduce((acc, b) => acc + b.units.length, 0);
   const completedCount = Object.keys(progress.completedLessons).length;
@@ -64,6 +67,14 @@ export const DuolingoPathView: React.FC<DuolingoPathViewProps> = ({
               >
                 <Play className="h-4 w-4" aria-hidden="true" />
                 <span>Configurar simulacro oficial (-1/3)</span>
+              </button>
+              <button
+                type="button"
+                onClick={onOpenChallengeModal}
+                className="inline-flex items-center gap-2 rounded-lg bg-[#9F1239] px-4 py-2.5 text-sm font-semibold text-white hover:bg-[#881337] transition-colors cursor-pointer"
+              >
+                <Swords className="h-4 w-4" aria-hidden="true" />
+                <span>Retar por enlace</span>
               </button>
               <button
                 type="button"
@@ -238,7 +249,7 @@ export const DuolingoPathView: React.FC<DuolingoPathViewProps> = ({
         </div>
       </section>
 
-      {/* Duolingo-style 7-Block Learning Path */}
+      {/* Gamified 7-Block Learning Path */}
       <section aria-labelledby="ruta-bloques-heading">
         <div className="flex flex-wrap items-baseline justify-between gap-2">
           <h2 id="ruta-bloques-heading" className="text-xl font-bold text-[#0F172A]">

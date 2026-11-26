@@ -51,7 +51,7 @@ export const MistakeClinicView: React.FC<MistakeClinicViewProps> = ({
               Mi Clínica de Fallos
             </h1>
             <p className="mt-2 max-w-2xl text-sm text-[#475569]">
-              Cada pregunta fallada en la Ruta Duolingo o en los Simulacros se registra aquí
+              Cada pregunta fallada en la Ruta de Estudio o en los Simulacros se registra aquí
               automáticamente para evitar penalizaciones de -1/3 en el examen real.
             </p>
           </div>
@@ -154,7 +154,7 @@ export const MistakeClinicView: React.FC<MistakeClinicViewProps> = ({
               : 'Tu clínica de fallos está limpia en este filtro'}
           </h2>
           <p className="mt-1 text-sm text-[#475569]">
-            Completa lecciones de la Ruta Duolingo o realiza un Simulacro para detectar puntos
+            Completa lecciones de la Ruta de Estudio o realiza un Simulacro para detectar puntos
             débiles y reforzarlos aquí.
           </p>
         </div>
